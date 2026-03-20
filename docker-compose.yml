@@ -1,0 +1,68 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI for candidate to inspect queues
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: docintelligence
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: pg_isready -U postgres
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  mockai:
+    build:
+      context: .
+      dockerfile: src/MockAiApi/Dockerfile
+    ports:
+      - "5050:5050"
+
+  ingestion:
+    build:
+      context: .
+      dockerfile: src/IngestionService/Dockerfile
+    ports:
+      - "5100:5100"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RabbitMq__Host=rabbitmq
+
+  enrichment:
+    build:
+      context: .
+      dockerfile: src/EnrichmentService/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      - RabbitMq__Host=rabbitmq
+      - AiApi__BaseUrl=http://mockai:5050
+
+  persistence:
+    build:
+      context: .
+      dockerfile: src/PersistenceService/Dockerfile
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      - RabbitMq__Host=rabbitmq
+      - ConnectionStrings__Default=Host=postgres;Database=docintelligence;Username=postgres;Password=postgres
