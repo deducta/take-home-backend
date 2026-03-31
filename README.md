@@ -48,6 +48,16 @@ Add a `SOLUTION.md` explaining:
 - What tradeoffs you considered
 - What you would do differently with more time
 
+## Submission
+
+This is a public repository. To submit your work:
+
+1. **Fork** this repo to your own GitHub account
+2. Complete the tasks on your fork
+3. Open a **Pull Request** against `main` on this repo
+
+Do **not** push branches directly to this repository.
+
 ## Rules
 
 - You MAY modify any service except `MockAiApi` (treat it as an external dependency you can't control)
