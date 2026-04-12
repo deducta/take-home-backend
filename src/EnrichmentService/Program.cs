@@ -21,11 +21,11 @@ builder.Services.AddMassTransit(x =>
         cfg.ReceiveEndpoint("document-submitted", e =>
         {
             e.PrefetchCount = 50;
-            e.ConcurrentMessageLimit = 30;
+            e.ConcurrentMessageLimit = 20;
 
             e.UseMessageRetry(r =>
             {
-                r.Interval(2, TimeSpan.FromSeconds(1));
+                r.Interval(5, TimeSpan.FromSeconds(1));
             });
 
             e.ConfigureConsumer<DocumentSubmittedConsumer>(context);
