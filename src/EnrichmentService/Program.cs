@@ -1,3 +1,4 @@
+using DocIntelligence.Contracts;
 using EnrichmentService.Consumers;
 using MassTransit;
 
@@ -8,10 +9,30 @@ builder.Services.AddTransient(sp => sp.GetRequiredService<IHttpClientFactory>().
 
 builder.Services.AddMassTransit(x =>
 {
-    x.AddConsumer<DocumentSubmittedConsumer>();
+    var messageLimit = builder.Configuration.GetValue<int>("MessageLimit");
+    var interval = builder.Configuration.GetValue<int>("Interval");
+
+    x.AddConfigureEndpointsCallback((_, cfg) =>
+    {
+        if (cfg is IRabbitMqReceiveEndpointConfigurator endpointConfigurator)
+            endpointConfigurator.SingleActiveConsumer = true;
+    });
+    
+    x.AddConsumer<DocumentSubmittedConsumer>(cfg =>
+    {
+        cfg.Options<BatchOptions>(options =>
+            options
+                .SetMessageLimit(messageLimit)
+                .SetTimeLimit(s: interval)
+                .SetTimeLimitStart(BatchTimeLimitStart.FromLast)
+        );
+    });
 
     x.UsingRabbitMq((context, cfg) =>
     {
+        cfg.PrefetchCount = messageLimit;
+        cfg.ConcurrentMessageLimit = messageLimit;
+
         cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
         {
             h.Username("guest");
@@ -20,14 +41,8 @@ builder.Services.AddMassTransit(x =>
 
         cfg.ReceiveEndpoint("document-submitted", e =>
         {
-            e.PrefetchCount = 50;
-            e.ConcurrentMessageLimit = 30;
-
-            e.UseMessageRetry(r =>
-            {
-                r.Interval(2, TimeSpan.FromSeconds(1));
-            });
-
+            e.UseRateLimit(messageLimit, TimeSpan.FromSeconds(interval));
+            e.UseMessageRetry(r => { r.Interval(5, TimeSpan.FromSeconds(1)); });
             e.ConfigureConsumer<DocumentSubmittedConsumer>(context);
         });
     });

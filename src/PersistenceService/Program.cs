@@ -6,17 +6,22 @@ using PersistenceService.Data;
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("Default")
-    ?? "Host=localhost;Database=docintelligence;Username=postgres;Password=postgres";
+                       ?? "Host=localhost;Database=docintelligence;Username=postgres;Password=postgres";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddMassTransit(x =>
 {
-    x.AddConsumer<DocumentEnrichedConsumer>();
+    var messageLimit = builder.Configuration.GetValue<int>("MessageLimit");
+    x.AddConsumer<DocumentEnrichedConsumer>(cfg =>
+    {
+        cfg.Options<BatchOptions>(options => options.SetMessageLimit(messageLimit));
+    });
 
     x.UsingRabbitMq((context, cfg) =>
     {
+        cfg.PrefetchCount = messageLimit;
         cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
         {
             h.Username("guest");
