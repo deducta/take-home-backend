@@ -5,7 +5,7 @@ using PersistenceService.Data;
 
 namespace PersistenceService.Consumers;
 
-public class DocumentEnrichedConsumer : IConsumer<DocumentEnriched>
+public class DocumentEnrichedConsumer : IConsumer<Batch<DocumentEnriched>>
 {
     private readonly AppDbContext _db;
     private readonly ILogger<DocumentEnrichedConsumer> _logger;
@@ -16,27 +16,29 @@ public class DocumentEnrichedConsumer : IConsumer<DocumentEnriched>
         _logger = logger;
     }
 
-    public async Task Consume(ConsumeContext<DocumentEnriched> context)
+    public async Task Consume(ConsumeContext<Batch<DocumentEnriched>> context)
     {
-        var message = context.Message;
-
-        var result = new DocumentResult
+        var results = context.Message.Select(consumedMessage =>
         {
-            Id = Guid.NewGuid(),
-            DocumentId = message.DocumentId,
-            BatchId = message.BatchId,
-            DocumentType = message.DocumentType,
-            Classification = message.Classification,
-            ExtractedEntities = JsonSerializer.Serialize(message.ExtractedEntities),
-            ConfidenceScore = message.ConfidenceScore,
-            EnrichedAt = message.EnrichedAt,
-            PersistedAt = DateTime.UtcNow,
-            ProcessingCount = 1
-        };
+            var message = consumedMessage.Message;
+            return new DocumentResult
+            {
+                Id = Guid.NewGuid(),
+                DocumentId = message.DocumentId,
+                BatchId = message.BatchId,
+                DocumentType = message.DocumentType,
+                Classification = message.Classification,
+                ExtractedEntities = JsonSerializer.Serialize(message.ExtractedEntities),
+                ConfidenceScore = message.ConfidenceScore,
+                EnrichedAt = message.EnrichedAt,
+                PersistedAt = DateTime.UtcNow,
+                ProcessingCount = 1
+            };
+        });
 
-        _db.DocumentResults.Add(result);
+        _db.DocumentResults.AddRange(results);
         await _db.SaveChangesAsync();
 
-        _logger.LogInformation("Persisted document {DocumentId}", message.DocumentId);
+        _logger.LogInformation("Persisted documents with length {count}", context.Message.Length);
     }
 }

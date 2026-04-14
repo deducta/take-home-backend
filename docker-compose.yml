@@ -53,6 +53,8 @@ services:
     environment:
       - RabbitMq__Host=rabbitmq
       - AiApi__BaseUrl=http://mockai:5050
+      - MessageLimit=20
+      - Interval=5
 
   persistence:
     build:
@@ -66,3 +68,4 @@ services:
     environment:
       - RabbitMq__Host=rabbitmq
       - ConnectionStrings__Default=Host=postgres;Database=docintelligence;Username=postgres;Password=postgres
+      - MessageLimit=20

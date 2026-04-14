@@ -1,5 +1,6 @@
 using DocIntelligence.Contracts;
 using MassTransit;
+using System.Linq;
 
 public static class DocumentEndpoints
 {
@@ -11,17 +12,17 @@ public static class DocumentEndpoints
         {
             var batchId = Guid.NewGuid();
 
-            foreach (var doc in request.Documents)
-            {
-                await publishEndpoint.Publish(new DocumentSubmitted
+            var documents =
+                request.Documents.Select(doc => new DocumentSubmitted
                 {
                     DocumentId = Guid.NewGuid(),
                     Content = doc.Content,
                     DocumentType = doc.Type,
                     BatchId = batchId,
                     SubmittedAt = DateTime.UtcNow
-                });
-            }
+                }).ToList();
+            
+            await publishEndpoint.PublishBatch(documents);
 
             return Results.Accepted(value: new { BatchId = batchId, Count = request.Documents.Count });
         });
