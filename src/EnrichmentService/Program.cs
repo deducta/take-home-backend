@@ -1,8 +1,11 @@
+using System.Net;
+using EnrichmentService.Services;
 using EnrichmentService.Consumers;
 using MassTransit;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddSingleton<AIRateLimiter>();
 builder.Services.AddHttpClient();
 builder.Services.AddTransient(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient());
 
@@ -25,7 +28,18 @@ builder.Services.AddMassTransit(x =>
 
             e.UseMessageRetry(r =>
             {
-                r.Interval(2, TimeSpan.FromSeconds(1));
+                r.Exponential(
+                    3, 
+                    TimeSpan.FromSeconds(1), 
+                    TimeSpan.FromSeconds(10), 
+                    TimeSpan.FromSeconds(2));
+                
+                r.Handle<HttpRequestException>(ex =>
+                    ex.StatusCode is
+                        HttpStatusCode.TooManyRequests or
+                        HttpStatusCode.ServiceUnavailable or
+                        HttpStatusCode.BadGateway or
+                        HttpStatusCode.GatewayTimeout);
             });
 
             e.ConfigureConsumer<DocumentSubmittedConsumer>(context);
